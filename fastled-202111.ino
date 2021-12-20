@@ -33,6 +33,9 @@ void setup() {
   FastLED.addLeds<LED_TYPE,DATA_PIN>(leds, NUM_LEDS)
     .setCorrection(TypicalLEDStrip);
 
+  // randomize math
+  random16_add_entropy(analogRead(A0));
+
   // initial palette setup
   updateColorPalette(gTargetPalette);
 }
@@ -64,6 +67,8 @@ void loop() {
   }
 
   EVERY_N_SECONDS(5) {
+    random16_add_entropy(analogRead(A0));
+
     // @todo use command instead of timer
     updateColorPalette(gTargetPalette);
   }
@@ -93,9 +98,9 @@ void updateColorPalette(CRGBPalette16& pal) {
   uint8_t baseC = random8();
 
   gTargetPalette = CRGBPalette16(
-    CHSV(baseC + random8(32), 255, random8(128, 255)),
-    CHSV(baseC + random8(64), 255, random8(128, 255)),
-    CHSV(baseC + random8(96), 192, random8(128, 255)),
-    CHSV(baseC + random8(16), 255, random8(128, 255))
+    CHSV(baseC + 16 + random8(16), 255, random8(128, 255)),
+    CHSV(baseC + 32 + random8(32), 192, random8(128, 255)),
+    CHSV(baseC + 48 + random8(48), 160, random8(128, 255)),
+    CHSV(baseC + 8 + random8(8), 255, random8(128, 255))
   );
 }
