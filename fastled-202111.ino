@@ -61,12 +61,10 @@ void loop() {
 
   EVERY_N_MILLISECONDS(10) {
     nblendPaletteTowardPalette(gCurrentPalette, gTargetPalette, 12);
-
-    uint8_t wAmount = quadwave8(millis() / 100);
-    analogWrite(W_PIN, wAmount);
   }
 
   EVERY_N_SECONDS(5) {
+    // @todo use command instead of timer
     updateColorPalette(gTargetPalette);
   }
 
