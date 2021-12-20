@@ -19,6 +19,11 @@ CRGBArray<NUM_LEDS> leds;
 CRGBPalette16 gCurrentPalette(CRGB::Black);
 CRGBPalette16 gTargetPalette;
 
+// W-pin animation state (using just the R channel)
+// the palette helps define the "breath"
+CRGBPalette16 wColorCurrent(CRGB::Black);
+CRGBPalette16 wColorTarget(CRGB::Black);
+
 // @todo fluorescent bulb startup animation
 void setup() {
   // W pin init
@@ -38,22 +43,24 @@ void setup() {
   random16_add_entropy(analogRead(A0));
 
   // initial palette setup
-  fillRandomPalette(gTargetPalette);
+  fillRandomRGBPalette(gTargetPalette);
 }
 
 #define MAX_COMMAND_LEN 255
 char commandBuffer[MAX_COMMAND_LEN + 1];
 int commandLength = 0;
 
-#define COMMAND_COUNT 2
-char * commandStrings[] = {
+#define COMMAND_COUNT 3
+char * commandStrings[COMMAND_COUNT] = {
   "off",
-  "rgb"
+  "rgb",
+  "warm"
 };
 typedef void (*commandPointer)();
-commandPointer commands[] = {
+commandPointer commands[COMMAND_COUNT] = {
   command_off,
-  command_rgb
+  command_rgb,
+  command_warm
 };
 
 void runCommand() {
@@ -91,18 +98,18 @@ void loop() {
 
   EVERY_N_MILLISECONDS(10) {
     nblendPaletteTowardPalette(gCurrentPalette, gTargetPalette, 12);
+    nblendPaletteTowardPalette(wColorCurrent, wColorTarget, 12);
   }
 
   EVERY_N_SECONDS(5) {
     random16_add_entropy(analogRead(A0));
 
     // @todo cycle this occasionally, still
-    // fillRandomPalette(gTargetPalette);
+    // fillRandomRGBPalette(gTargetPalette);
   }
 
   drawLEDs();
-
-  FastLED.show();
+  drawWPin();
 }
 
 #define NOISE_SCALE 80
@@ -118,10 +125,25 @@ void drawLEDs() {
     // index into the palette
     leds[i] = ColorFromPalette(gCurrentPalette, value, 255, LINEARBLEND);
   }
+
+  // render out to the wire
+  FastLED.show();
+}
+
+void drawWPin() {
+  uint32_t clock32 = millis(); // @todo carry out
+
+  // generate simplex noise
+  // @todo consider circle looping
+  uint8_t value = inoise8(0, clock32 / 10);
+
+  // index into the palette and write to PWM pin
+  CRGB wAmount = ColorFromPalette(wColorCurrent, value, 255, LINEARBLEND);
+  analogWrite(W_PIN, wAmount.r);
 }
 
 // fill palette with random colours
-void fillRandomPalette(CRGBPalette16& pal) {
+void fillRandomRGBPalette(CRGBPalette16& pal) {
   uint8_t baseC = random8();
 
   gTargetPalette = CRGBPalette16(
@@ -133,10 +155,24 @@ void fillRandomPalette(CRGBPalette16& pal) {
 }
 
 void command_off() {
-  // @todo W-pin
   gTargetPalette = CRGBPalette16(CRGB::Black);
+  wColorTarget = CRGBPalette16(CRGB::Black);
 }
 
 void command_rgb() {
-  fillRandomPalette(gTargetPalette);
+  fillRandomRGBPalette(gTargetPalette);
+  wColorTarget = CRGBPalette16(CRGB::Black);
+}
+
+void command_warm() {
+  gTargetPalette = CRGBPalette16(CRGB::Black);
+
+  uint8_t baseC = random8();
+
+  wColorTarget = CRGBPalette16(
+    CRGB(random8(128 + 64, 255), 0, 0),
+    CRGB(random8(128 + 16, 255 - 16), 0, 0),
+    CRGB(random8(128, 255 - 64), 0, 0),
+    CRGB(random8(128 + 32, 255 - 8), 0, 0)
+  );
 }
