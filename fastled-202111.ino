@@ -19,6 +19,7 @@ CRGBArray<NUM_LEDS> leds;
 CRGBPalette16 gCurrentPalette(CRGB::Black);
 CRGBPalette16 gTargetPalette;
 
+// @todo fluorescent bulb startup animation
 void setup() {
   // W pin init
   pinMode(W_PIN, OUTPUT);
@@ -37,22 +38,48 @@ void setup() {
   random16_add_entropy(analogRead(A0));
 
   // initial palette setup
-  updateColorPalette(gTargetPalette);
+  fillRandomPalette(gTargetPalette);
 }
 
 #define MAX_COMMAND_LEN 255
 char commandBuffer[MAX_COMMAND_LEN + 1];
 int commandLength = 0;
 
+#define COMMAND_COUNT 2
+char * commandStrings[] = {
+  "off",
+  "rgb"
+};
+typedef void (*commandPointer)();
+commandPointer commands[] = {
+  command_off,
+  command_rgb
+};
+
+void runCommand() {
+  for(int i = 0; i < COMMAND_COUNT; i++) {
+    if (strncmp(commandBuffer, commandStrings[i], MAX_COMMAND_LEN) == 0) {
+      commands[i]();
+      break;
+    }
+  }
+}
+
 void loop() {
   if (Serial.available() > 0) {
     char incomingByte = Serial.read();
     if (incomingByte == '\r') {
+      // cap the string
+      commandBuffer[commandLength] = 0;
+      runCommand();
+
       // reset command
       commandLength = 0;
 
       // echo new line and prompt
       Serial.write("\r\n> ");
+    } else if (incomingByte == '\n') {
+      // ignore completely @todo make either CR or LF work?
     } else if (commandLength < MAX_COMMAND_LEN) {
       commandBuffer[commandLength] = incomingByte;
       commandLength += 1;
@@ -69,8 +96,8 @@ void loop() {
   EVERY_N_SECONDS(5) {
     random16_add_entropy(analogRead(A0));
 
-    // @todo use command instead of timer
-    updateColorPalette(gTargetPalette);
+    // @todo cycle this occasionally, still
+    // fillRandomPalette(gTargetPalette);
   }
 
   drawLEDs();
@@ -78,7 +105,7 @@ void loop() {
   FastLED.show();
 }
 
-#define NOISE_SCALE 30
+#define NOISE_SCALE 80
 
 void drawLEDs() {
   uint32_t clock32 = millis();
@@ -94,7 +121,7 @@ void drawLEDs() {
 }
 
 // fill palette with random colours
-void updateColorPalette(CRGBPalette16& pal) {
+void fillRandomPalette(CRGBPalette16& pal) {
   uint8_t baseC = random8();
 
   gTargetPalette = CRGBPalette16(
@@ -103,4 +130,13 @@ void updateColorPalette(CRGBPalette16& pal) {
     CHSV(baseC + 48 + random8(48), 160, random8(128, 255)),
     CHSV(baseC + 8 + random8(8), 255, random8(128, 255))
   );
+}
+
+void command_off() {
+  // @todo W-pin
+  gTargetPalette = CRGBPalette16(CRGB::Black);
+}
+
+void command_rgb() {
+  fillRandomPalette(gTargetPalette);
 }
