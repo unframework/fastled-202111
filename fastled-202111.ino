@@ -19,6 +19,14 @@ CRGBArray<NUM_LEDS> leds;
 CRGBPalette16 gCurrentPalette(CRGB::Black);
 CRGBPalette16 gTargetPalette;
 
+bool usingHal = false;
+CRGBPalette16 halPalette = CRGBPalette16(
+  CRGB(255, 32, 0),
+  CRGB(0, 0, 0),
+  CRGB(0, 0, 0),
+  CRGB(255, 32, 0)
+);
+
 // W-pin animation state (using just the R channel)
 // the palette helps define the "breath"
 CRGBPalette16 wColorCurrent(CRGB::Black);
@@ -50,17 +58,21 @@ void setup() {
 char commandBuffer[MAX_COMMAND_LEN + 1];
 int commandLength = 0;
 
-#define COMMAND_COUNT 3
+#define COMMAND_COUNT 5
 char * commandStrings[COMMAND_COUNT] = {
   "off",
   "rgb",
-  "warm"
+  "warm",
+  "open the pod bay doors",
+  "hal"
 };
 typedef void (*commandPointer)();
 commandPointer commands[COMMAND_COUNT] = {
   command_off,
   command_rgb,
-  command_warm
+  command_warm,
+  command_hal,
+  command_hal
 };
 
 void runCommand() {
@@ -117,6 +129,17 @@ void loop() {
 void drawLEDs() {
   uint32_t clock32 = millis();
 
+  if (usingHal) {
+    uint8_t value = quadwave8(clock32 / 10);
+    CRGB halRGB = ColorFromPalette(halPalette, value, 255, LINEARBLEND);
+
+    for(int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = halRGB;
+    }
+    FastLED.show();
+    return;
+  }
+
   for(int i = 0; i < NUM_LEDS; i++) {
     // generate simplex noise using both X and Y
     // @todo consider circle looping
@@ -157,15 +180,18 @@ void fillRandomRGBPalette(CRGBPalette16& pal) {
 void command_off() {
   gTargetPalette = CRGBPalette16(CRGB::Black);
   wColorTarget = CRGBPalette16(CRGB::Black);
+  usingHal = false;
 }
 
 void command_rgb() {
   fillRandomRGBPalette(gTargetPalette);
   wColorTarget = CRGBPalette16(CRGB::Black);
+  usingHal = false;
 }
 
 void command_warm() {
   gTargetPalette = CRGBPalette16(CRGB::Black);
+  usingHal = false;
 
   uint8_t baseC = random8();
 
@@ -175,4 +201,12 @@ void command_warm() {
     CRGB(random8(128, 255 - 64), 0, 0),
     CRGB(random8(128 + 32, 255 - 8), 0, 0)
   );
+}
+
+void command_hal() {
+  gTargetPalette = CRGBPalette16(CRGB::Black); // reset for later
+  wColorTarget = CRGBPalette16(CRGB::Black); // reset for later
+
+  usingHal = true;
+  Serial.write("\r\n\r\nI'm sorry, Dave, I'm afraid I can't do that.\r\n");
 }
